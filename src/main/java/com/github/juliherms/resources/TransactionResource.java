@@ -4,9 +4,7 @@ import com.github.juliherms.handlers.TransactionServiceFallbackHandler;
 import com.github.juliherms.services.AccountService;
 import com.github.juliherms.services.AccountServiceProgrammatic;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
-import org.eclipse.microprofile.faulttolerance.Bulkhead;
-import org.eclipse.microprofile.faulttolerance.CircuitBreaker;
-import org.eclipse.microprofile.faulttolerance.Fallback;
+import org.eclipse.microprofile.faulttolerance.*;
 import org.eclipse.microprofile.faulttolerance.exceptions.BulkheadException;
 import org.eclipse.microprofile.rest.client.RestClientBuilder;
 import org.eclipse.microprofile.rest.client.inject.RestClient;
@@ -25,6 +23,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 @Path("/transactions")
 @Produces(MediaType.APPLICATION_JSON)
@@ -78,7 +77,7 @@ public class TransactionResource {
     }
 
     /**
-     * Method responsbile to create transaction sync
+     * Method responsible to create transaction sync
      * Bulkhead - Limits the number of concurrent requests
      * @param accountNumber
      * @param amount
@@ -119,6 +118,26 @@ public class TransactionResource {
                         .build(AccountServiceProgrammatic.class);
 
         return acctService.transactAsync(accountNumber, amount);
+    }
+
+    /**
+     * This method responsible to return actual balance by account number
+     * @param accountNumber
+     * @return
+     */
+    @GET
+    @Path("/{acctnumber}/balance")
+    @Timeout(100)
+    @Retry(delay = 100,
+            jitter = 25,
+            maxRetries = 3,
+            retryOn = TimeoutException.class)
+    @Fallback(value = TransactionServiceFallbackHandler.class)
+    @Produces(MediaType.APPLICATION_JSON)
+    public Response getBalance(@PathParam("acctnumber") Long accountNumber) {
+
+        String balance = accountService.getBalance(accountNumber).toString();
+        return Response.ok(balance).build();
     }
 
 }
