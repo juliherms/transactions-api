@@ -53,6 +53,11 @@ public interface AccountService {
     /**
      * Method responsible to send transaction to account-api - async
      * Send message into Header param
+     * Description:
+     * In recent years, there’s more desire to write reactive code,
+     * ideally not blocking threads while waiting. Because calling an external service could be a slow operation,
+     * depending on network latency, network load, and many other factors,
+     * it would be a good idea to utilize asynchronous types when using the REST client.
      * @param accountNumber
      * @param amount
      * @return

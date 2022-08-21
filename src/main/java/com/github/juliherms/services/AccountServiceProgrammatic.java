@@ -5,6 +5,11 @@ import javax.ws.rs.core.MediaType;
 import java.math.BigDecimal;
 import java.util.concurrent.CompletionStage;
 
+/**
+ * In addition to utilizing CDI for injecting and calling REST client beans for external interfaces,
+ * we can use a programmatic builder API instead. This API provides more control over the various settings
+ * of the REST client without needing to manipulate configuration values
+ */
 @Path("/accounts")
 @Produces(MediaType.APPLICATION_JSON)
 public interface AccountServiceProgrammatic {

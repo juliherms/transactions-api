@@ -1,8 +1,13 @@
-package com.github.juliherms.exceptions.resources;
+package com.github.juliherms.resources;
 
+import com.github.juliherms.handlers.TransactionServiceFallbackHandler;
 import com.github.juliherms.services.AccountService;
 import com.github.juliherms.services.AccountServiceProgrammatic;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
+import org.eclipse.microprofile.faulttolerance.Bulkhead;
+import org.eclipse.microprofile.faulttolerance.CircuitBreaker;
+import org.eclipse.microprofile.faulttolerance.Fallback;
+import org.eclipse.microprofile.faulttolerance.exceptions.BulkheadException;
 import org.eclipse.microprofile.rest.client.RestClientBuilder;
 import org.eclipse.microprofile.rest.client.inject.RestClient;
 
@@ -13,6 +18,7 @@ import javax.ws.rs.core.Response;
 import java.math.BigDecimal;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.time.temporal.ChronoUnit;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -64,11 +70,32 @@ public class TransactionResource {
     public CompletionStage<Map<String, List<String>>> newTransactionAsync(
             @PathParam("acctNumber") Long accountNumber,
             BigDecimal amount) {
+
+        System.out.println("chamou o metodo async");
+        System.out.println("Valor " + amount.toString());
+
         return accountService.transactAsync(accountNumber, amount);
     }
 
+    /**
+     * Method responsbile to create transaction sync
+     * Bulkhead - Limits the number of concurrent requests
+     * @param accountNumber
+     * @param amount
+     * @return
+     * @throws MalformedURLException
+     */
     @POST
     @Path("/api/{acctNumber}")
+    @Bulkhead(1) //If more than one concurrent operation is attempted, a BulkheadException will be thrown.
+    @CircuitBreaker(
+            requestVolumeThreshold=3,
+            failureRatio=.66,
+            delay = 1,
+            delayUnit = ChronoUnit.SECONDS,
+            successThreshold=2
+    )
+    @Fallback(value = TransactionServiceFallbackHandler.class)
     public Response newTransactionWithApi(@PathParam("acctNumber") Long accountNumber,
                                           BigDecimal amount) throws MalformedURLException {
         AccountServiceProgrammatic acctService =
@@ -81,4 +108,17 @@ public class TransactionResource {
         acctService.transact(accountNumber, amount);
         return Response.ok().build();
     }
+
+    @POST
+    @Path("/api/async/{acctNumber}")
+    public CompletionStage<Void> newTransactionWithApiAsync(@PathParam("acctNumber") Long accountNumber,
+                                                            BigDecimal amount) throws MalformedURLException {
+        AccountServiceProgrammatic acctService =
+                RestClientBuilder.newBuilder()
+                        .baseUrl(new URL(accountServiceUrl))
+                        .build(AccountServiceProgrammatic.class);
+
+        return acctService.transactAsync(accountNumber, amount);
+    }
+
 }
